@@ -4,10 +4,17 @@
 
 ### Added
 
-- Unit test suite with Vitest (35 tests)
+- 3 new MCP tools for PDF/attachment access:
+  - `get_item_attachments` — list attachments with local path detection
+  - `get_item_fulltext` — full-text content (local cache → API fallback)
+  - `read_attachment` — read file (local path → API base64 download)
+- 3 new `ZoteroClient` methods: `getItemChildren`, `getFullText`,
+  `downloadAttachment`
+- Type definitions: `ZoteroAttachmentData`, `ZoteroFullText`, `AttachmentInfo`
+- `ZOTERO_DATA_DIR` env variable for local Zotero storage (default: `~/Zotero`)
+- Unit test suite with Vitest (45 tests)
   - `escapeHtml` utility tests (7 tests)
-  - `ZoteroClient` tests with fetch mocking (28 tests): constructor, rate
-    limiting, error handling, all public API methods
+  - `ZoteroClient` tests with fetch mocking (38 tests)
 - `src/utils.ts` — extracted `escapeHtml` for testability
 - `npm test` script
 

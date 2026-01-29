@@ -8,7 +8,9 @@ npm paketi olarak dağıtılır: `npx -y zotero-mcp`
 ```
 src/
 ├── index.ts          # MCP server: tool tanımları, env kontrol, stdio transport
-└── zotero-api.ts     # ZoteroClient sınıfı: rate limiting, tüm HTTP işlemleri
+├── zotero-api.ts     # ZoteroClient sınıfı: rate limiting, tüm HTTP işlemleri
+├── utils.ts          # Utility fonksiyonlar (escapeHtml)
+└── __tests__/        # Vitest unit testleri
 ```
 
 - `dist/` → TypeScript build çıktısı (git'e dahil değil)
@@ -29,10 +31,11 @@ src/
 | `zod` | Tool parametre şema doğrulama (SDK peer dep) |
 | `typescript` (dev) | Derleyici |
 | `@types/node` (dev) | Node.js tip tanımları |
+| `vitest` (dev) | Test framework |
 
 **Ek HTTP istemci YOK** — Node 18+ `fetch` API'si kullanılır.
 
-## MCP Tools (5 adet)
+## MCP Tools (8 adet)
 
 | Tool | HTTP | Açıklama |
 |------|------|----------|
@@ -41,12 +44,21 @@ src/
 | `create_note` | POST /items | Standalone not oluştur (şablon opsiyonel) |
 | `add_note_to_collection` | GET + PATCH /items | Öğeyi koleksiyona ekle |
 | `search_items` | GET /items?q=... | Öğe ara (başlık/yazar/tam metin) |
+| `get_item_attachments` | GET /items/{key}/children | Ekleri listele (local path tespiti) |
+| `get_item_fulltext` | Local cache / GET /fulltext | Tam metin içerik (local-first) |
+| `read_attachment` | Local FS / GET /items/{key}/file | Dosya oku (local path veya API download) |
 
-## Ortam Değişkenleri (zorunlu)
+## Ortam Değişkenleri
 
+**Zorunlu:**
 ```
 ZOTERO_API_KEY      — Zotero API anahtarı
 ZOTERO_LIBRARY_ID   — Zotero kullanıcı kütüphane ID'si
+```
+
+**Opsiyonel:**
+```
+ZOTERO_DATA_DIR     — Local Zotero veri dizini (default: ~/Zotero)
 ```
 
 Koda gömülü API key veya library ID **OLMAMALI**.
@@ -56,6 +68,9 @@ Koda gömülü API key veya library ID **OLMAMALI**.
 ```bash
 # Build
 npm run build          # tsc && chmod 755 dist/index.js
+
+# Unit testler
+npm test               # vitest run (45 test)
 
 # MCP Inspector ile test
 ZOTERO_API_KEY=xxx ZOTERO_LIBRARY_ID=yyy \

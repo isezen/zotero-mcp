@@ -46,10 +46,11 @@ Restart Claude Desktop after saving.
 
 ## Environment Variables
 
-| Variable            | Required | Description                  |
-| ------------------- | -------- | ---------------------------- |
-| `ZOTERO_API_KEY`    | Yes      | Zotero API key               |
-| `ZOTERO_LIBRARY_ID` | Yes      | Zotero user library ID       |
+| Variable            | Required | Description                                    |
+| ------------------- | -------- | ---------------------------------------------- |
+| `ZOTERO_API_KEY`    | Yes      | Zotero API key                                 |
+| `ZOTERO_LIBRARY_ID` | Yes      | Zotero user library ID                         |
+| `ZOTERO_DATA_DIR`   | No       | Local Zotero data directory (default: ~/Zotero) |
 
 ## Available Tools
 
@@ -106,6 +107,30 @@ Search for items by title, creator, year, or full text.
 | `limit`     | number | 25                 | Max results (1–100)                  |
 | `offset`    | number | 0                  | Offset for pagination                |
 
+### `get_item_attachments`
+
+List attachments (PDFs, snapshots, etc.) for a Zotero item. Detects local file paths when Zotero Desktop storage is available.
+
+| Parameter | Type   | Required | Description          |
+| --------- | ------ | -------- | -------------------- |
+| `itemKey`  | string | Yes      | Parent item key      |
+
+### `get_item_fulltext`
+
+Get full-text content of an item. Checks local Zotero cache first (`.zotero-ft-cache`), falls back to the Zotero API fulltext endpoint.
+
+| Parameter | Type   | Required | Description                              |
+| --------- | ------ | -------- | ---------------------------------------- |
+| `itemKey`  | string | Yes      | Attachment or parent item key            |
+
+### `read_attachment`
+
+Read an attachment file. Returns the local file path (when Zotero Desktop storage is available) or downloads via API as base64. Auto-resolves parent item keys to their first PDF attachment.
+
+| Parameter | Type   | Required | Description                              |
+| --------- | ------ | -------- | ---------------------------------------- |
+| `itemKey`  | string | Yes      | Attachment or parent item key            |
+
 ## Development
 
 ```bash
@@ -113,6 +138,7 @@ git clone https://github.com/isezen/zotero-mcp.git
 cd zotero-mcp
 npm install
 npm run build
+npm test              # 45 unit tests (Vitest)
 ```
 
 ### Test with MCP Inspector
