@@ -7,15 +7,21 @@
  * management tools via the Zotero Web API v3.
  *
  * Tools:
- *   - list_collections   — List collections with pagination
- *   - create_collection   — Create a new collection
- *   - create_note         — Create a standalone note (with optional template)
+ *   - list_collections      — List collections with pagination
+ *   - create_collection      — Create a new collection
+ *   - create_note            — Create a standalone note (with optional template)
  *   - add_note_to_collection — Add an existing item to a collection
- *   - search_items        — Search items by title, creator, year, or full text
+ *   - search_items           — Search items by title, creator, year, or full text
+ *   - get_item_attachments   — List attachments for an item (local path detection)
+ *   - get_item_fulltext      — Get full-text content (local-first, API fallback)
+ *   - read_attachment        — Read attachment file (local path or base64 download)
  *
  * Environment variables (required):
  *   ZOTERO_API_KEY      — Zotero API key
  *   ZOTERO_LIBRARY_ID   — Zotero user library ID
+ *
+ * Environment variables (optional):
+ *   ZOTERO_DATA_DIR     — Local Zotero data directory (default: ~/Zotero)
  *
  * @see https://www.zotero.org/support/dev/web_api/v3/basics
  */
@@ -23,7 +29,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { existsSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import { ZoteroClient } from "./zotero-api.js";
+import type { AttachmentInfo } from "./zotero-api.js";
 import { escapeHtml } from "./utils.js";
 
 // ---------------------------------------------------------------------------
@@ -32,6 +42,8 @@ import { escapeHtml } from "./utils.js";
 
 const ZOTERO_API_KEY = process.env.ZOTERO_API_KEY;
 const ZOTERO_LIBRARY_ID = process.env.ZOTERO_LIBRARY_ID;
+
+const ZOTERO_DATA_DIR = process.env.ZOTERO_DATA_DIR ?? join(homedir(), "Zotero");
 
 if (!ZOTERO_API_KEY || !ZOTERO_LIBRARY_ID) {
   console.error(
@@ -403,6 +415,90 @@ server.tool(
                 offset: result.offset,
                 limit: result.limit,
               },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          { type: "text" as const, text: `Error: ${(error as Error).message}` },
+        ],
+        isError: true,
+      };
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Tool 6: get_item_attachments
+// ---------------------------------------------------------------------------
+
+server.tool(
+  "get_item_attachments",
+  "List attachments (PDFs, snapshots, etc.) for a Zotero item. Reports local file paths when Zotero Desktop storage is available.",
+  {
+    itemKey: z
+      .string()
+      .min(1)
+      .describe("Zotero item key (8-character key of the parent item)"),
+  },
+  async ({ itemKey }) => {
+    try {
+      const children = await zotero.getItemChildren(itemKey, true);
+
+      if (children.length === 0) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(
+                {
+                  message: `No attachments found for item ${itemKey}.`,
+                  itemKey,
+                  attachments: [],
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      }
+
+      const attachments: AttachmentInfo[] = children.map((child) => {
+        const d = child.data;
+        const filename = (d.filename as string) ?? "";
+        const key = d.key;
+        const info: AttachmentInfo = {
+          key,
+          title: d.title ?? filename,
+          contentType: (d.contentType as string) ?? "unknown",
+          filename,
+          linkMode: (d.linkMode as string) ?? "unknown",
+        };
+
+        // Check local file existence
+        if (filename && ZOTERO_DATA_DIR) {
+          const localPath = join(ZOTERO_DATA_DIR, "storage", key, filename);
+          if (existsSync(localPath)) {
+            info.localPath = localPath;
+            try {
+              info.fileSize = statSync(localPath).size;
+            } catch { /* ignore stat errors */ }
+          }
+        }
+        return info;
+      });
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(
+              { itemKey, attachments, totalAttachments: attachments.length },
               null,
               2,
             ),
