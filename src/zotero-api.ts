@@ -361,6 +361,28 @@ export class ZoteroClient {
   }
 
   /**
+   * List child items (attachments, notes) of a parent item.
+   * Optionally filter to only attachment items.
+   */
+  async getItemChildren(
+    itemKey: string,
+    attachmentsOnly = false,
+  ): Promise<ZoteroItem[]> {
+    const url = `${this.userPrefix}/items/${itemKey}/children?format=json`;
+    const response = await this.rateLimitedFetch(url, {
+      headers: this.headers(),
+    });
+
+    await this.throwOnError(response, `getItemChildren(${itemKey})`);
+    const items: ZoteroItem[] = (await response.json()) as ZoteroItem[];
+
+    if (attachmentsOnly) {
+      return items.filter((i) => i.data.itemType === "attachment");
+    }
+    return items;
+  }
+
+  /**
    * Search for items in the library with pagination.
    */
   async searchItems(params: {
