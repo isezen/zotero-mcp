@@ -361,6 +361,35 @@ export class ZoteroClient {
   }
 
   /**
+   * Download an attachment file from the Zotero API.
+   * Returns the file as a base64-encoded string together with metadata.
+   */
+  async downloadAttachment(
+    itemKey: string,
+  ): Promise<{ data: string; contentType: string; filename: string }> {
+    const url = `${this.userPrefix}/items/${itemKey}/file`;
+    const response = await this.rateLimitedFetch(url, {
+      headers: {
+        "Zotero-API-Version": "3",
+        "Zotero-API-Key": this.apiKey,
+      },
+    });
+
+    await this.throwOnError(response, `downloadAttachment(${itemKey})`);
+
+    const contentType =
+      response.headers.get("Content-Type") ?? "application/octet-stream";
+    const disposition = response.headers.get("Content-Disposition") ?? "";
+    const filenameMatch = disposition.match(/filename="?([^";\n]+)"?/);
+    const filename = filenameMatch?.[1] ?? `${itemKey}.bin`;
+
+    const buffer = await response.arrayBuffer();
+    const data = Buffer.from(buffer).toString("base64");
+
+    return { data, contentType, filename };
+  }
+
+  /**
    * Retrieve the full-text content indexed by Zotero for the given item.
    * Returns null if the item has not been indexed.
    */
