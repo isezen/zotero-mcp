@@ -361,6 +361,21 @@ export class ZoteroClient {
   }
 
   /**
+   * Retrieve the full-text content indexed by Zotero for the given item.
+   * Returns null if the item has not been indexed.
+   */
+  async getFullText(itemKey: string): Promise<ZoteroFullText | null> {
+    const url = `${this.userPrefix}/items/${itemKey}/fulltext`;
+    const response = await this.rateLimitedFetch(url, {
+      headers: this.headers(),
+    });
+
+    if (response.status === 404) return null;
+    await this.throwOnError(response, `getFullText(${itemKey})`);
+    return (await response.json()) as ZoteroFullText;
+  }
+
+  /**
    * List child items (attachments, notes) of a parent item.
    * Optionally filter to only attachment items.
    */
