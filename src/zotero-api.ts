@@ -82,6 +82,44 @@ export interface PaginatedResult<T> {
   limit: number;
 }
 
+/** Attachment-specific fields returned by Zotero API. */
+export interface ZoteroAttachmentData {
+  key: string;
+  version: number;
+  itemType: "attachment";
+  title?: string;
+  parentItem?: string;
+  contentType?: string;
+  filename?: string;
+  linkMode: "imported_file" | "linked_file" | "linked_url" | "imported_url";
+  path?: string;
+  url?: string;
+  accessDate?: string;
+  tags?: ZoteroTag[];
+  collections?: string[];
+  [field: string]: unknown;
+}
+
+/** Full-text content returned by Zotero fulltext endpoint. */
+export interface ZoteroFullText {
+  content: string;
+  indexedPages?: number;
+  totalPages?: number;
+  indexedChars?: number;
+  totalChars?: number;
+}
+
+/** Summarised attachment info for tool output. */
+export interface AttachmentInfo {
+  key: string;
+  title: string;
+  contentType: string;
+  filename: string;
+  linkMode: string;
+  localPath?: string;
+  fileSize?: number;
+}
+
 // ---------------------------------------------------------------------------
 // ZoteroClient
 // ---------------------------------------------------------------------------
