@@ -630,6 +630,138 @@ server.tool(
 );
 
 // ---------------------------------------------------------------------------
+// Tool 8: read_attachment
+// ---------------------------------------------------------------------------
+
+server.tool(
+  "read_attachment",
+  "Read an attachment file. Returns the local file path if available (so Claude can read it directly) or downloads via API as base64. Accepts either an attachment key or a parent item key (auto-resolves to the first PDF child).",
+  {
+    itemKey: z
+      .string()
+      .min(1)
+      .describe(
+        "Zotero item key — either the attachment key or the parent item key. " +
+        "When a parent key is given, the first PDF attachment is used.",
+      ),
+  },
+  async ({ itemKey }) => {
+    try {
+      // Resolve to an attachment key if a parent item is given.
+      let attachmentKey = itemKey;
+      let filename = "";
+      let contentType = "";
+
+      const item = await zotero.getItem(itemKey);
+      if (item.data.itemType === "attachment") {
+        filename = (item.data.filename as string) ?? "";
+        contentType = (item.data.contentType as string) ?? "";
+      } else {
+        const children = await zotero.getItemChildren(itemKey, true);
+        const pdfChild = children.find(
+          (c) => (c.data.contentType as string) === "application/pdf",
+        );
+        const target = pdfChild ?? children[0];
+        if (!target) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify(
+                  {
+                    itemKey,
+                    message:
+                      "No attachments found for this item. " +
+                      "Only metadata is available — a review based on metadata alone may be unreliable.",
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+        attachmentKey = target.data.key;
+        filename = (target.data.filename as string) ?? "";
+        contentType = (target.data.contentType as string) ?? "";
+      }
+
+      // 1. Try local file
+      if (filename && ZOTERO_DATA_DIR) {
+        const localPath = join(
+          ZOTERO_DATA_DIR,
+          "storage",
+          attachmentKey,
+          filename,
+        );
+        if (existsSync(localPath)) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify(
+                  {
+                    itemKey,
+                    attachmentKey,
+                    source: "local",
+                    localPath,
+                    contentType,
+                    filename,
+                    message:
+                      "File is available locally. Use the localPath to read it directly.",
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+      }
+
+      // 2. Download from API
+      const download = await zotero.downloadAttachment(attachmentKey);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(
+              {
+                itemKey,
+                attachmentKey,
+                source: "api",
+                contentType: download.contentType,
+                filename: download.filename,
+                sizeBytes: Buffer.from(download.data, "base64").length,
+                message:
+                  "File downloaded from Zotero API. The data field contains base64-encoded content.",
+              },
+              null,
+              2,
+            ),
+          },
+          {
+            type: "resource" as const,
+            resource: {
+              uri: `zotero://attachment/${attachmentKey}`,
+              mimeType: download.contentType,
+              blob: download.data,
+            },
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          { type: "text" as const, text: `Error: ${(error as Error).message}` },
+        ],
+        isError: true,
+      };
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
 // Server startup
 // ---------------------------------------------------------------------------
 
