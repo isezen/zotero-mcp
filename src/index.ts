@@ -29,7 +29,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { ZoteroClient } from "./zotero-api.js";
@@ -499,6 +499,119 @@ server.tool(
             type: "text" as const,
             text: JSON.stringify(
               { itemKey, attachments, totalAttachments: attachments.length },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          { type: "text" as const, text: `Error: ${(error as Error).message}` },
+        ],
+        isError: true,
+      };
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Tool 7: get_item_fulltext
+// ---------------------------------------------------------------------------
+
+server.tool(
+  "get_item_fulltext",
+  "Get the full-text content of an item. Checks local Zotero cache first, falls back to the Zotero API. Returns plain text extracted from the attachment (e.g. PDF).",
+  {
+    itemKey: z
+      .string()
+      .min(1)
+      .describe(
+        "Zotero item key — either the attachment key or the parent item key. " +
+        "When a parent key is given, the first PDF attachment is used.",
+      ),
+  },
+  async ({ itemKey }) => {
+    try {
+      // Try to resolve the attachment key when a parent item is given.
+      let attachmentKey = itemKey;
+      const item = await zotero.getItem(itemKey);
+      if (item.data.itemType !== "attachment") {
+        const children = await zotero.getItemChildren(itemKey, true);
+        const pdfChild = children.find(
+          (c) => (c.data.contentType as string) === "application/pdf",
+        );
+        if (pdfChild) {
+          attachmentKey = pdfChild.data.key;
+        } else if (children.length > 0) {
+          attachmentKey = children[0].data.key;
+        }
+        // If no children, keep the original key and let the API decide.
+      }
+
+      // 1. Try local .zotero-ft-cache
+      if (ZOTERO_DATA_DIR) {
+        const cachePath = join(
+          ZOTERO_DATA_DIR,
+          "storage",
+          attachmentKey,
+          ".zotero-ft-cache",
+        );
+        if (existsSync(cachePath)) {
+          const content = readFileSync(cachePath, "utf-8");
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify(
+                  { itemKey, attachmentKey, source: "local", content },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+      }
+
+      // 2. Fall back to Zotero API fulltext endpoint
+      const fulltext = await zotero.getFullText(attachmentKey);
+
+      if (!fulltext) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(
+                {
+                  itemKey,
+                  attachmentKey,
+                  message:
+                    "No full-text content available for this item. " +
+                    "The PDF may not have been indexed by Zotero yet.",
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      }
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(
+              {
+                itemKey,
+                attachmentKey,
+                source: "api",
+                content: fulltext.content,
+                indexedPages: fulltext.indexedPages,
+                totalPages: fulltext.totalPages,
+              },
               null,
               2,
             ),
