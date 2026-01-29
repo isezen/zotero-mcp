@@ -444,8 +444,14 @@ server.tool(
       .string()
       .min(1)
       .describe("Zotero item key (8-character key of the parent item)"),
+    forceRemote: z
+      .boolean()
+      .default(false)
+      .describe(
+        "When true, skip local storage detection and only report API-accessible info (default: false)",
+      ),
   },
-  async ({ itemKey }) => {
+  async ({ itemKey, forceRemote }) => {
     try {
       const children = await zotero.getItemChildren(itemKey, true);
 
@@ -480,8 +486,8 @@ server.tool(
           linkMode: (d.linkMode as string) ?? "unknown",
         };
 
-        // Check local file existence
-        if (filename && ZOTERO_DATA_DIR) {
+        // Check local file existence (skip when forceRemote is set)
+        if (!forceRemote && filename && ZOTERO_DATA_DIR) {
           const localPath = join(ZOTERO_DATA_DIR, "storage", key, filename);
           if (existsSync(localPath)) {
             info.localPath = localPath;
@@ -531,8 +537,14 @@ server.tool(
         "Zotero item key — either the attachment key or the parent item key. " +
         "When a parent key is given, the first PDF attachment is used.",
       ),
+    forceRemote: z
+      .boolean()
+      .default(false)
+      .describe(
+        "When true, skip local cache and fetch full text directly from Zotero API (default: false)",
+      ),
   },
-  async ({ itemKey }) => {
+  async ({ itemKey, forceRemote }) => {
     try {
       // Try to resolve the attachment key when a parent item is given.
       let attachmentKey = itemKey;
@@ -550,8 +562,8 @@ server.tool(
         // If no children, keep the original key and let the API decide.
       }
 
-      // 1. Try local .zotero-ft-cache
-      if (ZOTERO_DATA_DIR) {
+      // 1. Try local .zotero-ft-cache (skip when forceRemote is set)
+      if (!forceRemote && ZOTERO_DATA_DIR) {
         const cachePath = join(
           ZOTERO_DATA_DIR,
           "storage",
@@ -644,8 +656,14 @@ server.tool(
         "Zotero item key — either the attachment key or the parent item key. " +
         "When a parent key is given, the first PDF attachment is used.",
       ),
+    forceRemote: z
+      .boolean()
+      .default(false)
+      .describe(
+        "When true, skip local file and download directly from Zotero API (default: false)",
+      ),
   },
-  async ({ itemKey }) => {
+  async ({ itemKey, forceRemote }) => {
     try {
       // Resolve to an attachment key if a parent item is given.
       let attachmentKey = itemKey;
@@ -686,8 +704,8 @@ server.tool(
         contentType = (target.data.contentType as string) ?? "";
       }
 
-      // 1. Try local file
-      if (filename && ZOTERO_DATA_DIR) {
+      // 1. Try local file (skip when forceRemote is set)
+      if (!forceRemote && filename && ZOTERO_DATA_DIR) {
         const localPath = join(
           ZOTERO_DATA_DIR,
           "storage",

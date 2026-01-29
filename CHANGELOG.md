@@ -4,6 +4,9 @@
 
 ### Added
 
+- `forceRemote` parameter for `get_item_attachments`, `get_item_fulltext`,
+  and `read_attachment` — bypasses local storage and fetches directly from
+  the Zotero API when set to `true`
 - 3 new MCP tools for PDF/attachment access:
   - `get_item_attachments` — list attachments with local path detection
   - `get_item_fulltext` — full-text content (local cache → API fallback)

@@ -111,25 +111,28 @@ Search for items by title, creator, year, or full text.
 
 List attachments (PDFs, snapshots, etc.) for a Zotero item. Detects local file paths when Zotero Desktop storage is available.
 
-| Parameter | Type   | Required | Description          |
-| --------- | ------ | -------- | -------------------- |
-| `itemKey`  | string | Yes      | Parent item key      |
+| Parameter     | Type    | Required | Description                                      |
+| ------------- | ------- | -------- | ------------------------------------------------ |
+| `itemKey`     | string  | Yes      | Parent item key                                  |
+| `forceRemote` | boolean | No       | Skip local detection, API-only info (default: false) |
 
 ### `get_item_fulltext`
 
 Get full-text content of an item. Checks local Zotero cache first (`.zotero-ft-cache`), falls back to the Zotero API fulltext endpoint.
 
-| Parameter | Type   | Required | Description                              |
-| --------- | ------ | -------- | ---------------------------------------- |
-| `itemKey`  | string | Yes      | Attachment or parent item key            |
+| Parameter     | Type    | Required | Description                                      |
+| ------------- | ------- | -------- | ------------------------------------------------ |
+| `itemKey`     | string  | Yes      | Attachment or parent item key                    |
+| `forceRemote` | boolean | No       | Skip local cache, fetch from API (default: false) |
 
 ### `read_attachment`
 
 Read an attachment file. Returns the local file path (when Zotero Desktop storage is available) or downloads via API as base64. Auto-resolves parent item keys to their first PDF attachment.
 
-| Parameter | Type   | Required | Description                              |
-| --------- | ------ | -------- | ---------------------------------------- |
-| `itemKey`  | string | Yes      | Attachment or parent item key            |
+| Parameter     | Type    | Required | Description                                          |
+| ------------- | ------- | -------- | ---------------------------------------------------- |
+| `itemKey`     | string  | Yes      | Attachment or parent item key                        |
+| `forceRemote` | boolean | No       | Skip local file, download from API (default: false)  |
 
 ## Development
 
