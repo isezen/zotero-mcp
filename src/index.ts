@@ -24,6 +24,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { ZoteroClient } from "./zotero-api.js";
+import { escapeHtml } from "./utils.js";
 
 // ---------------------------------------------------------------------------
 // Environment validation
@@ -418,19 +419,6 @@ server.tool(
     }
   },
 );
-
-// ---------------------------------------------------------------------------
-// Utility
-// ---------------------------------------------------------------------------
-
-/** Escape HTML special characters in user-provided text. */
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 // ---------------------------------------------------------------------------
 // Server startup

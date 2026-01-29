@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Unit test suite with Vitest (35 tests)
+  - `escapeHtml` utility tests (7 tests)
+  - `ZoteroClient` tests with fetch mocking (28 tests): constructor, rate
+    limiting, error handling, all public API methods
+- `src/utils.ts` — extracted `escapeHtml` for testability
+- `npm test` script
+
+### Changed
+
+- `escapeHtml` moved from `index.ts` to `src/utils.ts`
+- `tsconfig.json` excludes `src/__tests__/` from build output
+
 ## [1.0.0] - 2026-01-29
 
 ### Added

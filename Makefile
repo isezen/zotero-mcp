@@ -1,5 +1,5 @@
 .PHONY: guard guard-origin guard-identity guard-status guard-commit guard-push guard-check
-.PHONY: build clean
+.PHONY: build test clean
 
 # ── Guard configuration ─────────────────────────────────────────────────────
 GUARD_ACCOUNT := isezen
@@ -70,6 +70,9 @@ guard-check:
 # ── Build targets ────────────────────────────────────────────────────────────
 build:
 	npm run build
+
+test:
+	npm test
 
 clean:
 	rm -rf dist
