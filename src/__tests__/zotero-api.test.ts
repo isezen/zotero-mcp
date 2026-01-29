@@ -513,4 +513,138 @@ describe("ZoteroClient", () => {
       ).rejects.toThrow(/temporarily unavailable/);
     });
   });
+
+  // -----------------------------------------------------------------------
+  // getItemChildren
+  // -----------------------------------------------------------------------
+
+  describe("getItemChildren", () => {
+    it("returns all children", async () => {
+      fetchMock.mockResolvedValueOnce(
+        mockResponse({ body: [FIXTURES.attachmentItem, FIXTURES.noteItem] }),
+      );
+
+      const result = await client.getItemChildren("ITEM1234");
+
+      expect(result).toHaveLength(2);
+      const url = fetchMock.mock.calls[0][0] as string;
+      expect(url).toContain("/items/ITEM1234/children");
+    });
+
+    it("filters to attachments only", async () => {
+      fetchMock.mockResolvedValueOnce(
+        mockResponse({ body: [FIXTURES.attachmentItem, FIXTURES.noteItem] }),
+      );
+
+      const result = await client.getItemChildren("ITEM1234", true);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].data.itemType).toBe("attachment");
+    });
+
+    it("throws on 404", async () => {
+      fetchMock.mockResolvedValueOnce(
+        mockResponse({ status: 404, bodyText: "" }),
+      );
+
+      await expect(client.getItemChildren("BAD")).rejects.toThrow(/Not found/);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // getFullText
+  // -----------------------------------------------------------------------
+
+  describe("getFullText", () => {
+    it("returns fulltext content", async () => {
+      fetchMock.mockResolvedValueOnce(
+        mockResponse({ body: FIXTURES.fulltext }),
+      );
+
+      const result = await client.getFullText("ATCH1234");
+
+      expect(result).not.toBeNull();
+      expect(result!.content).toBe(
+        "This is the full text content of the article.",
+      );
+      expect(result!.indexedPages).toBe(10);
+    });
+
+    it("returns null on 404 (not indexed)", async () => {
+      fetchMock.mockResolvedValueOnce(
+        mockResponse({ status: 404, bodyText: "" }),
+      );
+
+      const result = await client.getFullText("NOTEXT");
+
+      expect(result).toBeNull();
+    });
+
+    it("builds correct URL", async () => {
+      fetchMock.mockResolvedValueOnce(
+        mockResponse({ body: FIXTURES.fulltext }),
+      );
+
+      await client.getFullText("ATCH1234");
+
+      const url = fetchMock.mock.calls[0][0] as string;
+      expect(url).toContain("/items/ATCH1234/fulltext");
+    });
+
+    it("throws on other errors", async () => {
+      fetchMock.mockResolvedValueOnce(
+        mockResponse({ status: 403, bodyText: "Forbidden" }),
+      );
+
+      await expect(client.getFullText("BAD")).rejects.toThrow(/Forbidden/);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // downloadAttachment
+  // -----------------------------------------------------------------------
+
+  describe("downloadAttachment", () => {
+    it("returns base64 data with metadata", async () => {
+      fetchMock.mockResolvedValueOnce(
+        mockResponse({
+          bodyText: "fake-pdf-content",
+          headers: {
+            "Content-Type": "application/pdf",
+            "Content-Disposition": 'attachment; filename="paper.pdf"',
+          },
+        }),
+      );
+
+      const result = await client.downloadAttachment("ATCH1234");
+
+      expect(result.contentType).toBe("application/pdf");
+      expect(result.filename).toBe("paper.pdf");
+      const decoded = Buffer.from(result.data, "base64").toString();
+      expect(decoded).toBe("fake-pdf-content");
+    });
+
+    it("uses fallback filename when Content-Disposition is missing", async () => {
+      fetchMock.mockResolvedValueOnce(
+        mockResponse({
+          bodyText: "data",
+          headers: { "Content-Type": "application/pdf" },
+        }),
+      );
+
+      const result = await client.downloadAttachment("ATCH1234");
+
+      expect(result.filename).toBe("ATCH1234.bin");
+    });
+
+    it("throws on 404", async () => {
+      fetchMock.mockResolvedValueOnce(
+        mockResponse({ status: 404, bodyText: "" }),
+      );
+
+      await expect(client.downloadAttachment("BAD")).rejects.toThrow(
+        /Not found/,
+      );
+    });
+  });
 });

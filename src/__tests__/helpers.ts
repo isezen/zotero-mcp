@@ -5,6 +5,7 @@
 import { vi } from "vitest";
 import type {
   ZoteroCollection,
+  ZoteroFullText,
   ZoteroItem,
   ZoteroWriteResponse,
 } from "../zotero-api.js";
@@ -35,6 +36,8 @@ export function mockResponse(opts: MockResponseOptions = {}): Response {
     headers,
     json: () => Promise.resolve(opts.body),
     text: () => Promise.resolve(bodyStr),
+    arrayBuffer: () =>
+      Promise.resolve(new TextEncoder().encode(bodyStr).buffer),
   } as unknown as Response;
 }
 
@@ -107,4 +110,28 @@ export const FIXTURES = {
     unchanged: {},
     failed: { "0": { code: 400, message: "Invalid input" } },
   } satisfies ZoteroWriteResponse,
+
+  attachmentItem: {
+    key: "ATCH1234",
+    version: 3,
+    library: { type: "user", id: 123456, name: "Test User" },
+    data: {
+      key: "ATCH1234",
+      version: 3,
+      itemType: "attachment",
+      title: "Test PDF",
+      parentItem: "ITEM1234",
+      contentType: "application/pdf",
+      filename: "test-article.pdf",
+      linkMode: "imported_file",
+      tags: [],
+      collections: [],
+    },
+  } satisfies ZoteroItem,
+
+  fulltext: {
+    content: "This is the full text content of the article.",
+    indexedPages: 10,
+    totalPages: 10,
+  } satisfies ZoteroFullText,
 } as const;
