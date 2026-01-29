@@ -1,0 +1,45 @@
+{
+  "name": "zotero-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Zotero Web API v3 — manage collections, notes, and search items via Claude",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "zotero-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE.md"
+  ],
+  "scripts": {
+    "build": "tsc && chmod 755 dist/index.js",
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build",
+    "inspector": "npx @modelcontextprotocol/inspector dist/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "zotero",
+    "model-context-protocol",
+    "claude",
+    "ai"
+  ],
+  "author": "isezen",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/isezen/zotero-mcp"
+  }
+}

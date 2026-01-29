@@ -1,0 +1,10 @@
+# Git identity guard policy (repo-local)
+
+# Enforced commit identity
+EXPECTED_EMAIL="613356+isezen@users.noreply.github.com"
+
+# Enforced push target (SSH host alias in ~/.ssh/config)
+EXPECTED_HOST="github-isezen"
+
+# Optional: exact origin (recommended for important repos)
+EXPECTED_ORIGIN="git@github-isezen:isezen/zotero-mcp.git"
