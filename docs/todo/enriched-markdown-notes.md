@@ -242,9 +242,74 @@ icerigi iki sekilde saklanabilir:
 3. API /fulltext endpoint'i
    ├─ EVET → API'den al (source: "api")
    └─ HAYIR → "No full-text content available" mesaji
+
+4. (Manuel / Claude karari) Figur veya gorsel analiz gerekiyorsa:
+   └─ Claude, `read_attachment` tool ile orijinal PDF'i indirir ve
+      multimodal PDF Reader ile okur.
 ```
 
-### 4. Yeni MCP Tool (Opsiyonel)
+> **Not:** Adim 1-3, `get_item_fulltext` tool'u tarafindan otomatik calisir.
+> Adim 4, zotero-mcp'nin degil **Claude'un kararidir** — kullanici veya Claude
+> figur/grafik analizi gerektigine karar verirse `read_attachment` tool'unu
+> cagirir. Bu adim programatik fallback'in parcasi degildir.
+
+### 4. Claude PDF Reader (Son Care / Figur Analizi)
+
+Claude multimodal bir modeldir ve `read_attachment` tool'u ile orijinal PDF'i
+indirip dogrudan okuyabilir. Ancak bu yontem, enriched markdown not'a kiyasla
+daha yavas ve pahalidir. Asagida Claude PDF Reader'in yetenekleri ve
+sinirlamalari belirtilmistir.
+
+#### Claude PDF Reader — Yetenekler
+
+| Icerik Turu | Okur mu? | Yorumlar mi? | Detay |
+|---|:-:|:-:|---|
+| **Duz metin** | ✅ | ✅ | Paragraflar, basliklar, listeler, referanslar |
+| **Tablolar** | ✅ | ✅ | Satir/sutun yapisini anlar, verileri cikarir |
+| **Formuller (gorsel)** | ✅ | ✅ | LaTeX, MathML, el yazisi — gorsel temsili okur |
+| **Figurler/grafikler** | ✅ | ✅ | Cubuk, cizgi, scatter, diyagram vb. yorumlar |
+| **Fotograflar/gorseller** | ✅ | ✅ | Sekiller, diyagramlar, akis semalari |
+| **Sayfa duzeni** | ✅ | ✅ | Cok sutunlu layout, baslik-altbilgi |
+| **OCR (taranmis PDF)** | ⚠️ | ⚠️ | Net taramalar iyi, dusuk kalite sorunlu |
+
+#### Claude PDF Reader — Sinirlamalar
+
+| Sinir | Aciklama |
+|-------|----------|
+| **Sayfa limiti** | Buyuk PDF'lerde (~100+ sayfa) son sayfalar atlanabilir |
+| **Cozunurluk** | Cok kucuk yazi/formul detayda kayip olabilir |
+| **Piksel hassasiyeti** | Grafikteki tam sayisal degerleri %100 dogru okuyamayabilir |
+| **Karmasik layout** | Cok sutunlu + ic ice tablo + formul → bazen karisabilir |
+| **Token maliyeti** | Goruntu token'lari metin token'larindan cok daha pahali |
+| **Hiz** | Her istek icin PDF render + goruntu isleme gerekir |
+| **Tekrarlanabilirlik** | Her okumada farkli detay seviyesi donebilir |
+
+#### Enriched Markdown Not vs Claude PDF Reader
+
+| | Enriched Markdown Not | Claude PDF Reader |
+|---|---|---|
+| **Formul** | LaTeX metin olarak → **tam dogru** | Gorselden okur → genelde dogru, nadiren hata |
+| **Tablo** | HTML/Markdown → **yapi korunmus** | Gorselden cikarir → cogunlukla dogru |
+| **Figur/grafik** | ❌ Yok (sadece metin referansi) | ✅ **Gorur ve yorumlar** |
+| **Hiz** | Aninda (metin olarak okunur) | Yavas (PDF render + goruntu isleme) |
+| **Maliyet** | Dusuk (metin token'lari) | Yuksek (goruntu token'lari) |
+| **Tutarlilik** | Her seferinde ayni icerik | Okumalar arasi fark olabilir |
+| **Erisim** | `get_item_fulltext` otomatik | `read_attachment` manuel/Claude karari |
+
+#### Ne Zaman Claude PDF Reader Kullanilmali?
+
+- ✅ Makale icindeki **figur veya grafikler** yorumlanmak istendiginde
+- ✅ Enriched markdown not **mevcut degilse** ve fulltext yetersiz kaldiginda
+- ✅ Formul/tablo cikariminin **gorsel dogrulamasi** gerektiginde
+- ✅ Taranmis (scanned) PDF'lerde metin cikarimi gerektiginde
+- ❌ Rutin metin/formul erisimi icin → enriched markdown not tercih edilmeli
+- ❌ Toplu islemler icin → cok pahali ve yavas
+
+> **Ozet:** Enriched markdown not, hizli ve dogru metin+formul erisimi saglar.
+> Claude PDF Reader ise figur analizi ve gorsel dogrulama icin son care olarak
+> kullanilir. Ikisi birbirini tamamlar.
+
+### 5. Yeni MCP Tool (Opsiyonel)
 
 Markdown notu olusturmak icin yeni bir tool eklenebilir:
 
