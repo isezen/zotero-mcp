@@ -36,12 +36,156 @@ markdown formatina cevirir. Bu arac:
 - Figur referanslarini metin olarak belirtir
 
 **Not:** Arac secimi kullaniciya aittir. zotero-mcp bu donusumu yapmaz,
-sadece sonucu okur. Olasi araclar:
+sadece sonucu okur. Arac secenekleri ve karsilastirmasi asagidadir.
 
-- [Marker](https://github.com/VikParuchuri/marker) — PDF → Markdown, LaTeX formul destegi
-- [Nougat](https://github.com/facebookresearch/nougat) — Akademik PDF → Markdown (Meta AI)
-- [MathPix](https://mathpix.com/) — Ticari, yuksek dogruluklu formul cikarimi
-- [PyMuPDF4LLM](https://github.com/pymupdf/PyMuPDF-Utilities) — PDF → LLM-optimized Markdown
+#### Arac Secenekleri
+
+| Ozellik | PaddleOCR-VL-1.5 ⭐ | PaddleOCR-VL | paddleocr (pipeline) | MinerU 2.5 | dots.ocr | Marker |
+|---------|---------------------|--------------|----------------------|------------|----------|--------|
+| **Lisans** | Apache 2.0 | Apache 2.0 | Apache 2.0 | AGPL-3.0 | MIT | GPL-3.0 |
+| **Yaklasim** | Tek VLM | Tek VLM | Pipeline (<100M) | Tek VLM | Tek VLM | Pipeline |
+| **Parametre** | 0.9B | 0.9B | <100M (coklu model) | 1.2B | 1.7B | Pipeline (kucuk) |
+| **LaTeX formul** | ✅ **SOTA (CDM 94.21%)** | ✅ CDM 91.43% | ✅ PP-FormulaNet | ✅ Iyi | ✅ Iyi | ✅ Var |
+| **Tablo destegi** | HTML (TEDS 90.97%) | HTML | HTML (SLANeXt) | HTML+LaTeX | HTML | Markdown |
+| **Okuma sirasi** | ✅ SOTA | ✅ SOTA | ✅ Iyi | ✅ SOTA | ✅ SOTA | ✅ Iyi |
+| **JSON cikti** | ✅ | ✅ | ✅ Tam layout | ✅ Tam layout | ✅ bbox+kategori | ✅ JSON modu |
+| **Markdown cikti** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **OmniDocBench** | **94.5%** | 92.56% | — | 90.67% | 87.5% | — |
+| **Apple MLX** | ❌ (cok yeni) | ✅ [MLX port](https://huggingface.co/gamhtoi/PaddleOCR-VL-MLX) | ❌ (CPU calısır) | ✅ vlm-mlx | ❌ | ⚠️ MPS |
+| **Kurulum** | Docker/vLLM | `pip install paddleocr[all]` | `pip install paddleocr[doc-parser]` | `pip install mineru[all]` | git clone + vLLM | `pip install marker-pdf` |
+| **MCP server** | ❌ | ❌ | ❌ | ✅ [mcp-mineru](https://github.com/TINKPA/mcp-mineru) | ❌ | ❌ |
+
+> **Not:** `paddleocr` pip paketi (v3.4.0, 29 Ocak 2026) hem PP-StructureV3
+> (pipeline) hem de PaddleOCR-VL (VLM) backend'lerini icerir. Kurulum:
+> `pip install "paddleocr[all]"` ile her ikisi de kullanilabilir.
+
+#### Cikti Formati Ozeti (LaTeX + JSON + Markdown destekleyenler)
+
+| Arac | Formul → LaTeX | JSON cikti | Markdown cikti |
+|------|:--------------:|:----------:|:--------------:|
+| **PaddleOCR-VL-1.5** | ✅ | ✅ | ✅ |
+| **PaddleOCR-VL** | ✅ | ✅ | ✅ |
+| **paddleocr (pipeline)** | ✅ | ✅ | ✅ |
+| **MinerU 2.5** | ✅ | ✅ | ✅ |
+| **dots.ocr** | ✅ | ✅ | ✅ |
+| **Marker** | ✅ | ✅ | ✅ |
+
+> Yalnizca uc kriteri de (LaTeX formul + JSON + Markdown) karsilayan araclar
+> listelenmistir. Elenenler: Nougat, MathPix (JSON yok), PyMuPDF4LLM (LaTeX+JSON yok).
+
+#### GPU Hiz Karsilastirmasi (A100, FastDeploy)
+
+| Model | Sayfa/sn | Token/sn | 512 sayfa toplam | RTX 4090D VRAM |
+|-------|----------|----------|------------------|----------------|
+| **PaddleOCR-VL-1.5** | **1.43** | **2016** | 944 sn | 16.3 GB |
+| PaddleOCR-VL | 1.23 | 1700 | 1104 sn | — |
+| MinerU 2.5 | 1.00 | 1415 | 1356 sn | — |
+| MonkeyOCR-pro-1.2B | 0.63 | 949 | 2152 sn | — |
+| dots.ocr | 0.28 | 374 | 3236 sn | — |
+
+> Kaynak: [PaddleOCR-VL-1.5 arxiv makalesi, Tablo 6](https://arxiv.org/html/2601.21957v1)
+
+#### Apple M1 Max 32 GB Performans Tahmini
+
+| Arac | Backend | 8 sayfa | 20 sayfa | 100 makale (ort. 15 s.) | Bellek |
+|------|---------|---------|----------|-------------------------|--------|
+| **PaddleOCR-VL** | MLX (topluluk) | **~30 sn** | **~1.2 dk** | **~6.5 saat** | ~4 GB |
+| paddleocr pipeline | CPU | ~50 sn | ~2 dk | ~11 saat | ~4-6 GB |
+| MinerU | vlm-mlx-engine | ~6 dk | ~15 dk | ~19 saat | ~6-8 GB |
+| Marker | MPS (PyTorch) | ~2 dk | ~5 dk | ~6 saat | ~3-4 GB |
+| dots.ocr | MPS (PyTorch) | ~60 dk | ~2.5 saat | ~125 saat | ~10-15 GB |
+
+> **Not:** PaddleOCR-VL MLX tahmini M4 Max benchmark'ina (~2-3 sn/goruntu)
+> dayanir. M1 Max biraz daha yavas olabilir (~3-5 sn/goruntu).
+> PaddleOCR-VL-**1.5** icin MLX portu henuz mevcut degil (29 Ocak 2026'da cikti).
+
+#### Saklama Limitleri Karsilastirmasi
+
+| | Yerel (`.zotero-ft-cache`) | API (`/fulltext`) | Child Note |
+|---|---|---|---|
+| **PDF limiti** | Varsayilan 100 sayfa | Belgelenmemis | — |
+| **Metin limiti** | Varsayilan 500K karakter | Belgelenmemis | **250K karakter** (sync) |
+| **Format** | Duz metin | Duz metin | HTML |
+| **Formul/figur** | ❌ Yok | ❌ Yok | ✅ LaTeX yazilabilir |
+| **Yapi/duzen** | ❌ Kayip | ❌ Kayip | ✅ Korunabilir |
+
+> Tipik bir akademik makale markdown formatinda ~40-80K karakter tutar,
+> 250K limitinin cok altinda kalir.
+
+#### Tavsiye (Ocak 2026)
+
+##### Donanim Bazinda Onerilen Arac
+
+| | Apple M1 Max 32 GB | RTX 3090 24 GB (Linux) |
+|---|---|---|
+| **1. Tercih** | PaddleOCR-VL (MLX) | PaddleOCR-VL-1.5 (CUDA) |
+| **Dogruluk** | %92.56 | **%94.5** |
+| **Formul CDM** | %91.43 | **%94.21** |
+| **Hiz** | ~3-5 sn/goruntu | ~0.8-1.2 sayfa/sn |
+| **Bellek** | ~4 GB | ~16 GB |
+| **2. Tercih** | paddleocr pipeline (CPU) | MinerU 2.5 (vLLM) |
+| **Neden 2.?** | MLX gerektirmez, zaten kurulu | MCP server mevcut |
+
+##### Apple M1 Max 32 GB — PaddleOCR-VL (MLX)
+
+1. ✅ **MLX native** — ~3-5 sn/goruntu, ~4 GB bellek
+2. ✅ **OmniDocBench %92.56** — MinerU (%90.67) ve dots.ocr'dan (%87.5) iyi
+3. ✅ **Formul CDM %91.43** — cok iyi LaTeX cikarimi
+4. ✅ **0.9B parametre** — en kompakt SOTA model
+5. ✅ **Apache 2.0** — en ozgur lisans
+
+```bash
+# MLX portu kurulumu
+pip install mlx transformers pillow
+# Model: gamhtoi/PaddleOCR-VL-MLX (HuggingFace)
+```
+
+**2. tercih:** `paddleocr` pipeline (CPU) — `narin_belgesel/.venv`'de
+zaten kurulu (v3.3.3), ~5-8 sn/goruntu, MLX gerektirmez.
+
+```bash
+# Zaten kurulu olan paddleocr ile kullanim
+pip install "paddleocr[doc-parser]"
+```
+
+**Takip edilecek gelisme: PaddleOCR-VL-1.5 MLX portu**
+- PaddleOCR-VL-1.5 (29 Ocak 2026) OmniDocBench'te %94.5, formul CDM %94.21
+  ile en yuksek skoru tutuyor. MLX portu ciktiginda oyun tamamen degisir.
+- 0.9B parametre → MLX'te M1 Max'te ~2-4 sn/goruntu beklenir.
+
+##### RTX 3090 24 GB (Linux) — PaddleOCR-VL-1.5 (CUDA)
+
+1. ✅ **OmniDocBench %94.5** — tum modeller arasinda en yuksek (SOTA)
+2. ✅ **Formul CDM %94.21** — tum modeller arasinda en yuksek
+3. ✅ **A100'de 1.43 sayfa/sn** → RTX 3090'da ~1.0-1.2 sayfa/sn
+4. ✅ **RTX 4090D'de 16.3 GB VRAM** → 24 GB'ye rahatca sigar
+5. ✅ **Apache 2.0** — en ozgur lisans
+
+```bash
+# Kurulum (Linux + CUDA)
+pip install "paddleocr[all]"
+# veya dogrudan vLLM ile
+vllm serve PaddlePaddle/PaddleOCR-VL-1.5 --trust-remote-code
+```
+
+**2. tercih:** MinerU 2.5 — MCP server mevcut (Claude entegrasyonu hazir),
+ama dogruluk (%90.67) ve hiz (1.00 sayfa/sn) daha dusuk.
+
+```bash
+pip install mineru[all]
+mineru -p input.pdf -o output/ -b vlm-vllm-engine
+```
+
+**Toplu is icin alternatifler:** Replicate API, RunPod/Lambda Labs bulut GPU
+
+#### Diger Araclar
+
+- [PaddleOCR (pipeline)](https://github.com/PaddlePaddle/PaddleOCR) — PP-StructureV3, CPU'da calisir, `pip install paddleocr[doc-parser]`
+- [Marker](https://github.com/VikParuchuri/marker) — Hizli pipeline, iyi genel kalite, formul SOTA degil
+- [dots.ocr](https://github.com/rednote-hilab/dots.ocr) — En zengin JSON (bbox+11 kategori), Apple destegi zayif
+- [Nougat](https://github.com/facebookresearch/nougat) — Meta AI, akademik PDF'ler icin, Apple destegi zayif
+- [MathPix](https://mathpix.com/) — Ticari, yuksek dogruluklu formul cikarimi, API-tabanli
+- [PyMuPDF4LLM](https://github.com/pymupdf/PyMuPDF-Utilities) — Hafif, hizli, formul destegi sinirli
 
 ### 2. Zotero'ya Child Note Olarak Ekleme
 
@@ -157,9 +301,31 @@ Bu tool:
 
 ## Kaynaklar
 
+### Zotero API & Internals
 - [Zotero Web API v3: Write Requests](https://www.zotero.org/support/dev/web_api/v3/write_requests)
 - [Zotero Web API v3: Full-Text Content](https://www.zotero.org/support/dev/web_api/v3/fulltext_content)
 - [Zotero Web API v3: Basics](https://www.zotero.org/support/dev/web_api/v3/basics)
 - [Zotero Forum: Note Character Limits](https://forums.zotero.org/discussion/31735/notes-characters-length)
 - [Zotero Forum: Note File Size Limits](https://forums.zotero.org/discussion/7211/note-file-size-limits)
 - [Zotero GitHub: pdf-worker](https://github.com/zotero/pdf-worker)
+
+### PDF → Markdown Araclari
+- [PaddleOCR GitHub](https://github.com/PaddlePaddle/PaddleOCR) — v3.4.0, PP-StructureV3 + PaddleOCR-VL
+- [PaddleOCR-VL-1.5 Paper (arxiv)](https://arxiv.org/html/2601.21957v1)
+- [PaddleOCR-VL Paper (arxiv)](https://arxiv.org/html/2510.14528v1)
+- [PaddleOCR-VL-1.5 HuggingFace](https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.5)
+- [PaddleOCR-VL MLX Port (topluluk)](https://huggingface.co/gamhtoi/PaddleOCR-VL-MLX)
+- [paddleocr PyPI](https://pypi.org/project/paddleocr/)
+- [MinerU GitHub](https://github.com/opendatalab/MinerU)
+- [MinerU2.5 Paper (arxiv)](https://arxiv.org/abs/2509.22186)
+- [mcp-mineru (Claude MCP Server)](https://github.com/TINKPA/mcp-mineru)
+- [dots.ocr GitHub](https://github.com/rednote-hilab/dots.ocr)
+- [dots.ocr Paper (arxiv)](https://arxiv.org/abs/2512.02498)
+- [Marker GitHub](https://github.com/datalab-to/marker)
+- [Nougat GitHub](https://github.com/facebookresearch/nougat)
+
+### Benchmark & Karsilastirma
+- [OmniDocBench (CVPR 2025)](https://github.com/opendatalab/OmniDocBench)
+- [Formula Extraction Benchmark (arxiv)](https://arxiv.org/abs/2512.09874)
+- [Production-Grade LLM Inference on Apple Silicon (arxiv)](https://arxiv.org/abs/2511.05502)
+- [PaddleOCR 3.0 Technical Report (arxiv)](https://arxiv.org/abs/2507.05595)
