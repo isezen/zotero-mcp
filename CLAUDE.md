@@ -7,21 +7,26 @@ npm paketi olarak dağıtılır: `npx -y zotero-mcp`
 
 ```
 src/
-├── index.ts          # MCP server: tool tanımları, env kontrol, stdio transport
+├── index.ts          # MCP server: 9 tool tanımı, env kontrol, stdio + SSE transport
 ├── zotero-api.ts     # ZoteroClient sınıfı: rate limiting, tüm HTTP işlemleri
-├── utils.ts          # Utility fonksiyonlar (escapeHtml)
-└── __tests__/        # Vitest unit testleri
+├── utils.ts          # Utility fonksiyonlar (escapeHtml, Markdown formatters)
+└── __tests__/        # Vitest unit testleri (84 test)
+    ├── helpers.ts        # Test yardımcıları (mock fetch, fixtures)
+    ├── utils.test.ts     # Utility fonksiyon testleri (39 test)
+    └── zotero-api.test.ts # ZoteroClient testleri (45 test)
 ```
 
 - `dist/` → TypeScript build çıktısı (git'e dahil değil)
 - `node_modules/` → bağımlılıklar (git'e dahil değil)
+- `Dockerfile` → Multi-stage Docker build (SSE transport)
+- `docs/` → Teknik dokümanlar
 
 ## Teknoloji
 
 - **Dil:** TypeScript (ES2022, Node16 modül)
 - **Çalışma zamanı:** Node.js >= 18 (built-in `fetch` kullanılır)
 - **Paket tipi:** ES modules (`"type": "module"`)
-- **Transport:** stdio (JSON-RPC over stdin/stdout)
+- **Transport:** stdio (default) veya SSE (`--transport sse --port 3000`)
 
 ## Bağımlılıklar
 
@@ -35,7 +40,7 @@ src/
 
 **Ek HTTP istemci YOK** — Node 18+ `fetch` API'si kullanılır.
 
-## MCP Tools (8 adet)
+## MCP Tools (9 adet)
 
 | Tool | HTTP | Açıklama |
 |------|------|----------|
@@ -43,22 +48,25 @@ src/
 | `create_collection` | POST /collections | Yeni koleksiyon oluştur |
 | `create_note` | POST /items | Standalone not oluştur (şablon opsiyonel) |
 | `add_note_to_collection` | GET + PATCH /items | Öğeyi koleksiyona ekle |
-| `search_items` | GET /items?q=... | Öğe ara (başlık/yazar/tam metin) |
+| `get_item` | GET /items/{key} | Tek öğe metadata (Markdown çıktı) |
+| `search_items` | GET /items?q=... | Öğe ara (tag filtre, Markdown çıktı) |
 | `get_item_attachments` | GET /items/{key}/children | Ekleri listele (local path tespiti) |
 | `get_item_fulltext` | Local cache / GET /fulltext | Tam metin içerik (local-first) |
 | `read_attachment` | Local FS / GET /items/{key}/file | Dosya oku (local path veya API download) |
 
 ## Ortam Değişkenleri
 
-**Zorunlu:**
+**Zorunlu** (ZOTERO_LOCAL=true değilse):
 ```
 ZOTERO_API_KEY      — Zotero API anahtarı
-ZOTERO_LIBRARY_ID   — Zotero kullanıcı kütüphane ID'si
+ZOTERO_LIBRARY_ID   — Zotero kullanıcı/grup kütüphane ID'si
 ```
 
 **Opsiyonel:**
 ```
 ZOTERO_DATA_DIR     — Local Zotero veri dizini (default: ~/Zotero)
+ZOTERO_LOCAL        — Zotero Desktop local API modu (default: false)
+ZOTERO_LIBRARY_TYPE — "user" (default) veya "group"
 ```
 
 Koda gömülü API key veya library ID **OLMAMALI**.
@@ -70,11 +78,19 @@ Koda gömülü API key veya library ID **OLMAMALI**.
 npm run build          # tsc && chmod 755 dist/index.js
 
 # Unit testler
-npm test               # vitest run (45 test)
+npm test               # vitest run (84 test)
 
 # MCP Inspector ile test
 ZOTERO_API_KEY=xxx ZOTERO_LIBRARY_ID=yyy \
   npx @modelcontextprotocol/inspector dist/index.js
+
+# SSE transport testi
+ZOTERO_API_KEY=xxx ZOTERO_LIBRARY_ID=yyy \
+  node dist/index.js --transport sse --port 3000
+
+# Docker build & run
+docker build -t zotero-mcp .
+docker run -p 3000:3000 -e ZOTERO_API_KEY=xxx -e ZOTERO_LIBRARY_ID=yyy zotero-mcp
 
 # Claude Code'a local ekle
 claude mcp add zotero-dev \
@@ -98,6 +114,9 @@ claude mcp add zotero-dev \
 - HTML çıktıda kullanıcı girdisi `escapeHtml()` ile temizlenir
 - Tüm tipler `zotero-api.ts`'de tanımlı ve export edilir
 - Tool parametreleri `zod` şema ile tanımlanır
+- `get_item` ve `search_items` çıktısı LLM-optimized Markdown formatında
+- Markdown helper'lar `utils.ts`'de: `formatCreator`, `htmlToMarkdown`,
+  `truncate`, `formatItemMarkdown`, `formatItemSummary`
 
 ## Git & Guard
 
