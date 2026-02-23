@@ -18,6 +18,8 @@ export interface ZoteroConfig {
   apiKey: string;
   libraryId: string;
   baseUrl?: string; // default: "https://api.zotero.org"
+  libraryType?: "user" | "group"; // default: "user"
+  isLocal?: boolean; // default: false — when true, connects to Zotero Desktop local API
 }
 
 export interface ZoteroCollectionData {
@@ -128,6 +130,8 @@ export class ZoteroClient {
   private readonly apiKey: string;
   private readonly libraryId: string;
   private readonly baseUrl: string;
+  private readonly libraryType: "user" | "group";
+  private readonly isLocal: boolean;
   private lastRequestTime = 0;
   private backoffUntil = 0;
 
@@ -136,6 +140,8 @@ export class ZoteroClient {
   constructor(config: ZoteroConfig) {
     this.apiKey = config.apiKey;
     this.libraryId = config.libraryId;
+    this.libraryType = config.libraryType ?? "user";
+    this.isLocal = config.isLocal ?? false;
     this.baseUrl = (config.baseUrl ?? "https://api.zotero.org").replace(
       /\/$/,
       "",
@@ -146,19 +152,23 @@ export class ZoteroClient {
   // Internal helpers
   // -------------------------------------------------------------------------
 
-  /** Base URL prefix for user library endpoints. */
+  /** Base URL prefix for library endpoints (user or group). */
   private get userPrefix(): string {
-    return `${this.baseUrl}/users/${this.libraryId}`;
+    const segment = this.libraryType === "group" ? "groups" : "users";
+    return `${this.baseUrl}/${segment}/${this.libraryId}`;
   }
 
-  /** Common headers for every request. */
+  /** Common headers for every request. Omits API key in local mode. */
   private headers(extra?: Record<string, string>): Record<string, string> {
-    return {
+    const h: Record<string, string> = {
       "Zotero-API-Version": "3",
-      "Zotero-API-Key": this.apiKey,
       "Content-Type": "application/json",
       ...extra,
     };
+    if (!this.isLocal) {
+      h["Zotero-API-Key"] = this.apiKey;
+    }
+    return h;
   }
 
   /**
@@ -369,10 +379,7 @@ export class ZoteroClient {
   ): Promise<{ data: string; contentType: string; filename: string }> {
     const url = `${this.userPrefix}/items/${itemKey}/file`;
     const response = await this.rateLimitedFetch(url, {
-      headers: {
-        "Zotero-API-Version": "3",
-        "Zotero-API-Key": this.apiKey,
-      },
+      headers: this.headers(),
     });
 
     await this.throwOnError(response, `downloadAttachment(${itemKey})`);
@@ -433,6 +440,7 @@ export class ZoteroClient {
     query: string;
     qmode?: "titleCreatorYear" | "everything";
     itemType?: string;
+    tag?: string;
     sort?: string;
     direction?: "asc" | "desc";
     limit?: number;
@@ -456,6 +464,9 @@ export class ZoteroClient {
 
     if (params.itemType) {
       searchParams.set("itemType", params.itemType);
+    }
+    if (params.tag) {
+      searchParams.set("tag", params.tag);
     }
 
     const url = `${this.userPrefix}/items?${searchParams.toString()}`;

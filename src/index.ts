@@ -11,17 +11,20 @@
  *   - create_collection      — Create a new collection
  *   - create_note            — Create a standalone note (with optional template)
  *   - add_note_to_collection — Add an existing item to a collection
+ *   - get_item               — Get a single item by key with full metadata
  *   - search_items           — Search items by title, creator, year, or full text
  *   - get_item_attachments   — List attachments for an item (local path detection)
  *   - get_item_fulltext      — Get full-text content (local-first, API fallback)
  *   - read_attachment        — Read attachment file (local path or base64 download)
  *
- * Environment variables (required):
+ * Environment variables (required unless ZOTERO_LOCAL=true):
  *   ZOTERO_API_KEY      — Zotero API key
- *   ZOTERO_LIBRARY_ID   — Zotero user library ID
+ *   ZOTERO_LIBRARY_ID   — Zotero user/group library ID
  *
  * Environment variables (optional):
  *   ZOTERO_DATA_DIR     — Local Zotero data directory (default: ~/Zotero)
+ *   ZOTERO_LOCAL        — Connect to Zotero Desktop local API (default: false)
+ *   ZOTERO_LIBRARY_TYPE — "user" (default) or "group"
  *
  * @see https://www.zotero.org/support/dev/web_api/v3/basics
  */
@@ -34,22 +37,31 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { ZoteroClient } from "./zotero-api.js";
 import type { AttachmentInfo } from "./zotero-api.js";
-import { escapeHtml } from "./utils.js";
+import {
+  escapeHtml,
+  formatItemMarkdown,
+  formatItemSummary,
+} from "./utils.js";
 
 // ---------------------------------------------------------------------------
 // Environment validation
 // ---------------------------------------------------------------------------
 
+const ZOTERO_LOCAL = process.env.ZOTERO_LOCAL === "true";
 const ZOTERO_API_KEY = process.env.ZOTERO_API_KEY;
 const ZOTERO_LIBRARY_ID = process.env.ZOTERO_LIBRARY_ID;
+const ZOTERO_LIBRARY_TYPE =
+  (process.env.ZOTERO_LIBRARY_TYPE ?? "user") as "user" | "group";
 
 const ZOTERO_DATA_DIR = process.env.ZOTERO_DATA_DIR ?? join(homedir(), "Zotero");
 
-if (!ZOTERO_API_KEY || !ZOTERO_LIBRARY_ID) {
+if (!ZOTERO_LOCAL && (!ZOTERO_API_KEY || !ZOTERO_LIBRARY_ID)) {
   console.error(
-    "Error: ZOTERO_API_KEY and ZOTERO_LIBRARY_ID environment variables are required.\n" +
+    "Error: ZOTERO_API_KEY and ZOTERO_LIBRARY_ID are required (unless ZOTERO_LOCAL=true).\n" +
       "  export ZOTERO_API_KEY=your_api_key\n" +
-      "  export ZOTERO_LIBRARY_ID=your_library_id",
+      "  export ZOTERO_LIBRARY_ID=your_library_id\n" +
+      "  # OR for local Zotero Desktop API:\n" +
+      "  export ZOTERO_LOCAL=true",
   );
   process.exit(1);
 }
@@ -59,8 +71,11 @@ if (!ZOTERO_API_KEY || !ZOTERO_LIBRARY_ID) {
 // ---------------------------------------------------------------------------
 
 const zotero = new ZoteroClient({
-  apiKey: ZOTERO_API_KEY,
-  libraryId: ZOTERO_LIBRARY_ID,
+  apiKey: ZOTERO_LOCAL ? "" : ZOTERO_API_KEY!,
+  libraryId: ZOTERO_LOCAL ? (ZOTERO_LIBRARY_ID ?? "0") : ZOTERO_LIBRARY_ID!,
+  libraryType: ZOTERO_LIBRARY_TYPE,
+  isLocal: ZOTERO_LOCAL,
+  baseUrl: ZOTERO_LOCAL ? "http://127.0.0.1:23119/api" : undefined,
 });
 
 const server = new McpServer({
@@ -334,7 +349,39 @@ server.tool(
 );
 
 // ---------------------------------------------------------------------------
-// Tool 5: search_items
+// Tool 5: get_item
+// ---------------------------------------------------------------------------
+
+server.tool(
+  "get_item",
+  "Get a single item by key. Returns full item metadata including title, creators, date, DOI, abstract, tags, and collections.",
+  {
+    itemKey: z
+      .string()
+      .min(1)
+      .describe("Zotero item key (8-character key)"),
+  },
+  async ({ itemKey }) => {
+    try {
+      const item = await zotero.getItem(itemKey);
+      return {
+        content: [
+          { type: "text" as const, text: formatItemMarkdown(item.data) },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          { type: "text" as const, text: `Error: ${(error as Error).message}` },
+        ],
+        isError: true,
+      };
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Tool 6: search_items
 // ---------------------------------------------------------------------------
 
 server.tool(
@@ -353,6 +400,12 @@ server.tool(
       .optional()
       .describe(
         "Filter by item type, e.g. 'journalArticle', 'book', 'note', 'conferencePaper' (optional)",
+      ),
+    tag: z
+      .string()
+      .optional()
+      .describe(
+        "Filter by tag. Supports boolean: 'tag1 || tag2' (OR), '-tag' (NOT). (optional)",
       ),
     sort: z
       .enum(["dateModified", "dateAdded", "title", "creator", "date"])
@@ -376,50 +429,27 @@ server.tool(
       .default(0)
       .describe("Number of results to skip for pagination (default 0)"),
   },
-  async ({ query, qmode, itemType, sort, direction, limit, offset }) => {
+  async ({ query, qmode, itemType, tag, sort, direction, limit, offset }) => {
     try {
       const result = await zotero.searchItems({
         query,
         qmode,
         itemType,
+        tag,
         sort,
         direction,
         limit,
         offset,
       });
 
-      const items = result.items.map((item) => ({
-        key: item.data.key,
-        itemType: item.data.itemType,
-        title:
-          item.data.title ??
-          item.data.note?.substring(0, 120) ??
-          "(no title)",
-        creators: item.data.creators?.map((c) =>
-          c.name ? c.name : `${c.lastName ?? ""}, ${c.firstName ?? ""}`,
-        ),
-        date: item.data.date,
-        tags: item.data.tags?.map((t) => t.tag),
-        collections: item.data.collections,
-        zoteroLink: `zotero://select/library/items/${item.data.key}`,
-      }));
+      const showStart = result.offset + 1;
+      const showEnd = result.offset + result.items.length;
+      const header = `**Found ${result.totalResults} items** (showing ${showStart}-${showEnd})`;
+      const items = result.items.map((item) => formatItemSummary(item.data));
+      const text = [header, "", ...items.flatMap((s) => [s, "\n---\n"])].join("\n").trimEnd();
 
       return {
-        content: [
-          {
-            type: "text" as const,
-            text: JSON.stringify(
-              {
-                items,
-                totalResults: result.totalResults,
-                offset: result.offset,
-                limit: result.limit,
-              },
-              null,
-              2,
-            ),
-          },
-        ],
+        content: [{ type: "text" as const, text }],
       };
     } catch (error) {
       return {
@@ -433,7 +463,7 @@ server.tool(
 );
 
 // ---------------------------------------------------------------------------
-// Tool 6: get_item_attachments
+// Tool 7: get_item_attachments
 // ---------------------------------------------------------------------------
 
 server.tool(
@@ -523,7 +553,7 @@ server.tool(
 );
 
 // ---------------------------------------------------------------------------
-// Tool 7: get_item_fulltext
+// Tool 8: get_item_fulltext
 // ---------------------------------------------------------------------------
 
 server.tool(
@@ -642,7 +672,7 @@ server.tool(
 );
 
 // ---------------------------------------------------------------------------
-// Tool 8: read_attachment
+// Tool 9: read_attachment
 // ---------------------------------------------------------------------------
 
 server.tool(
@@ -780,13 +810,76 @@ server.tool(
 );
 
 // ---------------------------------------------------------------------------
+// CLI arguments
+// ---------------------------------------------------------------------------
+
+function parseArgs(): { transport: "stdio" | "sse"; port: number } {
+  let transport: "stdio" | "sse" = "stdio";
+  let port = 3000;
+
+  for (let i = 2; i < process.argv.length; i++) {
+    if (process.argv[i] === "--transport" && process.argv[i + 1]) {
+      const v = process.argv[i + 1];
+      if (v === "stdio" || v === "sse") transport = v;
+      i++;
+    }
+    if (process.argv[i] === "--port" && process.argv[i + 1]) {
+      port = parseInt(process.argv[i + 1], 10);
+      i++;
+    }
+  }
+  return { transport, port };
+}
+
+// ---------------------------------------------------------------------------
 // Server startup
 // ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("Zotero MCP server running on stdio");
+  const args = parseArgs();
+
+  if (args.transport === "stdio") {
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error("Zotero MCP server running on stdio");
+  } else {
+    const { createServer } = await import("node:http");
+    const { SSEServerTransport } = await import(
+      "@modelcontextprotocol/sdk/server/sse.js"
+    );
+
+    const sessions = new Map<string, InstanceType<typeof SSEServerTransport>>();
+
+    const httpServer = createServer(async (req, res) => {
+      const url = new URL(req.url ?? "", `http://localhost:${args.port}`);
+
+      if (req.method === "GET" && url.pathname === "/sse") {
+        const transport = new SSEServerTransport("/messages", res);
+        sessions.set(transport.sessionId, transport);
+        transport.onclose = () => sessions.delete(transport.sessionId);
+        await server.connect(transport);
+        await transport.start();
+      } else if (req.method === "POST" && url.pathname === "/messages") {
+        const sessionId = url.searchParams.get("sessionId");
+        const transport = sessionId ? sessions.get(sessionId) : undefined;
+        if (!transport) {
+          res.writeHead(400, { "Content-Type": "text/plain" });
+          res.end("Invalid or missing sessionId");
+          return;
+        }
+        await transport.handlePostMessage(req, res);
+      } else {
+        res.writeHead(404, { "Content-Type": "text/plain" });
+        res.end("Not found");
+      }
+    });
+
+    httpServer.listen(args.port, () => {
+      console.error(
+        `Zotero MCP server running on SSE at http://localhost:${args.port}/sse`,
+      );
+    });
+  }
 }
 
 main().catch((error) => {

@@ -647,4 +647,103 @@ describe("ZoteroClient", () => {
       );
     });
   });
+
+  // -----------------------------------------------------------------------
+  // Local API mode
+  // -----------------------------------------------------------------------
+
+  describe("local API mode", () => {
+    let localClient: ZoteroClient;
+
+    beforeEach(() => {
+      localClient = new ZoteroClient({
+        apiKey: "",
+        libraryId: "0",
+        baseUrl: "http://127.0.0.1:23119/api",
+        isLocal: true,
+      });
+    });
+
+    it("uses localhost URL", async () => {
+      fetchMock.mockResolvedValueOnce(
+        mockResponse({ body: [], headers: { "Total-Results": "0" } }),
+      );
+      await localClient.listCollections();
+      const url = fetchMock.mock.calls[0][0] as string;
+      expect(url).toContain("http://127.0.0.1:23119/api/users/0/collections");
+    });
+
+    it("omits Zotero-API-Key header", async () => {
+      fetchMock.mockResolvedValueOnce(
+        mockResponse({ body: [], headers: { "Total-Results": "0" } }),
+      );
+      await localClient.listCollections();
+      const init = fetchMock.mock.calls[0][1] as RequestInit;
+      const headers = init.headers as Record<string, string>;
+      expect(headers["Zotero-API-Key"]).toBeUndefined();
+    });
+
+    it("still includes Zotero-API-Version header", async () => {
+      fetchMock.mockResolvedValueOnce(
+        mockResponse({ body: [], headers: { "Total-Results": "0" } }),
+      );
+      await localClient.listCollections();
+      const init = fetchMock.mock.calls[0][1] as RequestInit;
+      const headers = init.headers as Record<string, string>;
+      expect(headers["Zotero-API-Version"]).toBe("3");
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Group library
+  // -----------------------------------------------------------------------
+
+  describe("group library", () => {
+    it("uses /groups/ prefix when libraryType is group", async () => {
+      const groupClient = new ZoteroClient({
+        apiKey: "k",
+        libraryId: "99999",
+        libraryType: "group",
+      });
+      fetchMock.mockResolvedValueOnce(
+        mockResponse({ body: [], headers: { "Total-Results": "0" } }),
+      );
+      await groupClient.listCollections();
+      const url = fetchMock.mock.calls[0][0] as string;
+      expect(url).toContain("/groups/99999/collections");
+    });
+
+    it("defaults to /users/ prefix", async () => {
+      fetchMock.mockResolvedValueOnce(
+        mockResponse({ body: [], headers: { "Total-Results": "0" } }),
+      );
+      await client.listCollections();
+      const url = fetchMock.mock.calls[0][0] as string;
+      expect(url).toContain("/users/123456/collections");
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Tag search
+  // -----------------------------------------------------------------------
+
+  describe("tag search", () => {
+    it("includes tag parameter when provided", async () => {
+      fetchMock.mockResolvedValueOnce(
+        mockResponse({ body: [], headers: { "Total-Results": "0" } }),
+      );
+      await client.searchItems({ query: "test", tag: "machine-learning" });
+      const url = fetchMock.mock.calls[0][0] as string;
+      expect(url).toContain("tag=machine-learning");
+    });
+
+    it("omits tag parameter when not provided", async () => {
+      fetchMock.mockResolvedValueOnce(
+        mockResponse({ body: [], headers: { "Total-Results": "0" } }),
+      );
+      await client.searchItems({ query: "test" });
+      const url = fetchMock.mock.calls[0][0] as string;
+      expect(url).not.toContain("tag=");
+    });
+  });
 });
